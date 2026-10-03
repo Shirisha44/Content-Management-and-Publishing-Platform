@@ -2,36 +2,44 @@
 
 ## Inkwell — Blog Publishing Platform
 
-A small full-stack publishing app: a FastAPI and SQLAlchemy backend with a responsive React interface. Visitors can browse, search, and page through stories. Demo editor access enables creating, updating, and deleting posts.
+A full-stack publishing app: a FastAPI and SQLAlchemy backend with a responsive React interface. Anyone can browse published stories; registered users can have reader, writer, or admin roles.
 
 ## Stack
 
 - **Frontend:** React, Vite, Lucide
 - **Backend:** FastAPI, SQLAlchemy, Pydantic
-- **Database:** SQLite by default; set `DATABASE_URL` to use another SQLAlchemy-supported database
+- **Database:** SQLite locally; PostgreSQL recommended for deployed instances, managed with Alembic
 
 ## Run locally
 
 ### 1. Start the API
 
-From the project root, create the local environment file and replace its example values with private credentials:
+From the project root, create the local environment file and replace the JWT placeholder with a private random secret:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Set `JWT_SECRET_KEY` to a random secret of at least 32 characters, and set a private `ADMIN_USERNAME` and `ADMIN_PASSWORD` (at least 12 characters). For example, generate a random JWT secret with:
+Set `JWT_SECRET_KEY` to a random secret of at least 32 characters. For example, generate one locally with:
 
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Keep `.env` private; it is ignored by Git. Then install the dependencies and start the API:
+Keep `.env` private; it is ignored by Git. Install dependencies, migrate the database, explicitly create the first admin account, and start the API:
 
 ```powershell
 python -m pip install -r requirements.txt
+alembic upgrade head
+python -m create_admin
 python -m uvicorn main:app --reload
 ```
+
+The admin command prompts interactively for a username and password. Passwords are stored as bcrypt hashes. API startup does not create accounts automatically. Public registration offers reader or writer; admin accounts must be created explicitly or promoted by an existing admin.
+
+For password recovery, set `FRONTEND_URL` and configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_USERNAME`, and `SMTP_PASSWORD` in `.env` using your mail provider's SMTP settings. SMTP uses STARTTLS; username and password may both be empty only if the provider allows unauthenticated relay. Never commit SMTP credentials. New accounts require a recovery email. Existing accounts can add or update one from Profile after confirming their current password. Reset links expire after 30 minutes and can be used only once.
+
+Before applying a migration to an existing database, back it up. The story-workflow migration maps existing author usernames to user IDs where possible, changes existing author roles to writer, and keeps existing stories published. Stories without a matching account remain published without an owner and can be managed by an admin.
 
 The API runs at `http://127.0.0.1:8000`; interactive API docs are at `http://127.0.0.1:8000/docs`.
 
@@ -53,23 +61,38 @@ To point the frontend at a different backend, define `VITE_API_URL` in `frontend
 VITE_API_URL=http://127.0.0.1:8000
 ```
 
+For deployment, use a persistent hosted PostgreSQL database and set its connection string as `DATABASE_URL` in the host's environment settings. Set `CORS_ORIGINS` to a comma-separated list of the deployed frontend origins. Run `alembic upgrade head` against that database before starting the API. Do not commit database credentials. Hosted providers' free-tier limits and persistence policies can change; check the provider's current terms before choosing one.
+
 ## Using the app
 
-- Browse and search stories from the journal page.
-- Click a story to read it in the side panel.
-- Select **Enable editor** and sign in with the configured editor credentials.
-- In editor mode, write, edit, and delete stories.
+- Anyone can browse, search, and read published stories without signing in.
+- Create a reader or writer account. If no role is supplied, registration defaults to `reader`; public registration cannot create admins.
+- Accounts register with a recovery email. If you forget your password, select "Forgot password" on the sign-in page and follow the one-time link sent by email. Existing accounts can add a recovery email in Profile.
+- Signed-in readers and writers can like and bookmark published stories. View bookmarks through the signed-in account endpoint.
+- Writers can create drafts or publish stories, and can edit or delete only their own stories. Drafts are visible only to the owner and admins.
+- Admins are explicitly provisioned; they can manage members and any story.
 
-> **Deployment note:** authentication is for one editor configured through environment variables; it is not a user-registration or multi-user account system. Before public deployment, use HTTPS, keep environment secrets private, and configure deployment-specific protections such as rate limiting and secure secret management.
+> **Deployment note:** public registration has no email verification or rate limiting yet. Use HTTPS, keep secrets private, and add deployment-specific protections before exposing the service publicly.
 
 ## API overview
 
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/` | API health message |
-| `POST` | `/login` | Issue demo editor token |
-| `GET` | `/blogs` | List/search/page stories |
-| `GET` | `/blogs/{id}` | Fetch one story |
-| `POST` | `/blogs` | Create a story (bearer token required) |
-| `PUT` | `/blogs/{id}` | Update a story (bearer token required) |
-| `DELETE` | `/blogs/{id}` | Delete a story (bearer token required) |
+| `POST` | `/register` | Create a reader or author account (`reader` by default; no public admin signup) |
+| `POST` | `/login` | Sign in and receive a bearer token |
+| `POST` | `/password/forgot` | Request a one-time password reset link by email |
+| `POST` | `/password/reset` | Set a new password with a valid reset token |
+| `GET` | `/users/me` | Get the signed-in user's profile |
+| `PATCH` | `/users/me/email` | Add/update the recovery email (current password required) |
+| `GET` | `/users/me/bookmarks` | List the signed-in user's bookmarks |
+| `GET` | `/users` | List users (admin only) |
+| `PATCH` | `/users/{user_id}/role` | Change a user's role (admin only) |
+| `GET` | `/blogs` | Public list/search/pagination of published stories |
+| `GET` | `/blogs/{id}` | Fetch a published story; drafts are owner/admin-only |
+| `GET` | `/writer/stories` | List the signed-in writer's stories, including drafts |
+| `POST` | `/blogs` | Create a writer-owned story (draft by default; writer/admin) |
+| `PUT` | `/blogs/{id}` | Update an owned story (writer) or any story (admin), including status |
+| `DELETE` | `/blogs/{id}` | Delete an owned story (writer) or any story (admin) |
+| `POST` / `DELETE` | `/blogs/{id}/like` | Like or unlike a published story (authenticated) |
+| `POST` / `DELETE` | `/blogs/{id}/bookmark` | Bookmark or remove a bookmark for a published story (authenticated) |
