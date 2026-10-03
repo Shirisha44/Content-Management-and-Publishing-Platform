@@ -1,4 +1,6 @@
-# Inkwell — Blog Publishing Platform
+# Content-Management-and-Publishing-Platform
+
+## Inkwell — Blog Publishing Platform
 
 A small full-stack publishing app: a FastAPI and SQLAlchemy backend with a responsive React interface. Visitors can browse, search, and page through stories. Demo editor access enables creating, updating, and deleting posts.
 
