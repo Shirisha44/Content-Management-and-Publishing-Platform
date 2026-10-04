@@ -72,7 +72,7 @@ For deployment, use a persistent hosted PostgreSQL database and set its connecti
 - Readers can read published stories but cannot create, edit, or delete stories. Writers can read published stories and create drafts or publish stories, and can edit or delete only their own stories. Drafts are visible only to the owner and admins.
 - Admins can read and manage any story, including drafts, and can manage members.
 - Accounts can be permanently deleted from Profile after confirming the current password. Published stories remain available without an owner, drafts remain private to admins, and the deleted account's bookmarks and likes are removed. The last admin cannot delete their own account.
-- The story editor provides visual formatting for headings, bold, italic, underline, strikethrough, highlights, text colors, emoji, font family, size, and weight. It also supports links, lists, block quotes, and inline images; existing Markdown stories remain readable and can be opened for editing.
+- The story editor is visual, so writers can format content without typing Markdown syntax. Its toolbar supports headings, bold, italic, underline, strikethrough, highlights, text colors, emoji, font family, size, and weight, as well as links, lists, block quotes, and inline images. Existing Markdown stories remain readable and can be opened for editing.
 - Writers and admins can upload cover images, story background images, and pictures within story content. JPEG, PNG, GIF, and WebP images up to 5 MB are supported; uploaded files are stored in the API's `uploads/` directory. Keep this directory on persistent storage and include it in backups when deploying.
 
 > **Deployment note:** public registration has no email verification or rate limiting yet. Use HTTPS, keep secrets private, and add deployment-specific protections before exposing the service publicly.
@@ -82,7 +82,7 @@ For deployment, use a persistent hosted PostgreSQL database and set its connecti
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/` | API health message |
-| `POST` | `/register` | Create a reader or author account (`reader` by default; no public admin signup) |
+| `POST` | `/register` | Create a reader or writer account (`reader` by default; no public admin signup) |
 | `POST` | `/login` | Sign in and receive a bearer token |
 | `POST` | `/password/forgot` | Request a one-time password reset link by email |
 | `POST` | `/password/reset` | Set a new password with a valid reset token |
