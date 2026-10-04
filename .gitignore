@@ -8,3 +8,5 @@ frontend/dist/
 uploads/
 !uploads/
 !uploads/*.svg
+*.bak
+.vscode/
