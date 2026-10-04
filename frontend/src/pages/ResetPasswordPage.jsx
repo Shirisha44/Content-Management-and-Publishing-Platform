@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { KeyRound, LoaderCircle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import PasswordInput from "../components/PasswordInput.jsx";
 import { apiRequest } from "../lib/api.js";
 
 export default function ResetPasswordPage() {
@@ -56,8 +57,7 @@ export default function ResetPasswordPage() {
             <p className="login-intro">Use at least 12 characters for your new password.</p>
             <label className="form-label">
               NEW PASSWORD
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
                 minLength={12}
                 maxLength={72}

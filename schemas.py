@@ -57,6 +57,10 @@ class RecoveryEmailUpdate(BaseModel):
         return value.strip().lower()
 
 
+class AccountDeleteRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=72)
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -73,8 +77,26 @@ class UserRoleUpdate(BaseModel):
 #Input Schema
 class BlogCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    content: str = Field(min_length=1, max_length=20000)
+    content: str = Field(min_length=1, max_length=100000)
+    cover_image_url: str | None = Field(default=None, max_length=500)
+    cover_image_alt: str | None = Field(default=None, max_length=250)
+    background_image_url: str | None = Field(default=None, max_length=500)
+    background_image_alt: str | None = Field(default=None, max_length=250)
     status: Literal["draft", "published"] = "draft"
+
+    @field_validator("cover_image_url")
+    @classmethod
+    def validate_cover_image_url(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("/uploads/"):
+            raise ValueError("Cover images must be uploaded to this platform")
+        return value
+
+    @field_validator("background_image_url")
+    @classmethod
+    def validate_background_image_url(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("/uploads/"):
+            raise ValueError("Background images must be uploaded to this platform")
+        return value
 
 #Output Schema
 class BlogResponse(BaseModel):
@@ -83,6 +105,10 @@ class BlogResponse(BaseModel):
     id: int
     title: str
     content: str
+    cover_image_url: str | None
+    cover_image_alt: str | None
+    background_image_url: str | None
+    background_image_alt: str | None
     created_at: datetime
     updated_at: datetime
     author_id: int | None

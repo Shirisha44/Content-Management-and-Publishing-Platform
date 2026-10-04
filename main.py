@@ -1,11 +1,14 @@
 import os
 import hashlib
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +25,19 @@ from database import SessionLocal
 from email_service import EmailDeliveryError, send_password_reset_email
 
 app = FastAPI()
+UPLOAD_DIR = Path(os.getenv("IMAGE_UPLOAD_DIR", "uploads")).resolve()
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+IMAGE_SIGNATURES = {
+    "image/jpeg": (".jpg", lambda content: content.startswith(b"\xff\xd8\xff")),
+    "image/png": (".png", lambda content: content.startswith(b"\x89PNG\r\n\x1a\n")),
+    "image/gif": (".gif", lambda content: content.startswith((b"GIF87a", b"GIF89a"))),
+    "image/webp": (
+        ".webp",
+        lambda content: content.startswith(b"RIFF") and content[8:12] == b"WEBP",
+    ),
+}
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 allowed_origins = [
     origin.strip()
@@ -202,9 +218,63 @@ def require_admin(
     return user
 
 
+@app.post("/images", status_code=201)
+async def upload_image(
+    image: UploadFile = File(...),
+    user: models.User = Depends(require_writer_or_admin),
+):
+    image_type = IMAGE_SIGNATURES.get(image.content_type or "")
+    if image_type is None:
+        raise HTTPException(status_code=415, detail="Upload a JPEG, PNG, GIF, or WebP image")
+
+    content = await image.read(MAX_IMAGE_SIZE + 1)
+    await image.close()
+    if len(content) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="Images must be 5 MB or smaller")
+    extension, matches_signature = image_type
+    if not matches_signature(content):
+        raise HTTPException(status_code=415, detail="Image content does not match its file type")
+
+    filename = f"{uuid.uuid4().hex}{extension}"
+    (UPLOAD_DIR / filename).write_bytes(content)
+    return {"url": f"/uploads/{filename}"}
+
+
 @app.get("/users/me", response_model=schemas.UserResponse)
 def get_my_account(user: models.User = Depends(get_current_user)):
     return user
+
+
+@app.delete("/users/me", status_code=204)
+def delete_my_account(
+    request: schemas.AccountDeleteRequest,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    if len(request.current_password.encode("utf-8")) > 72 or not verify_password(
+        request.current_password,
+        user.password_hash,
+    ):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    if user.role == "admin":
+        admin_count = db.query(models.User).filter(models.User.role == "admin").count()
+        if admin_count <= 1:
+            raise HTTPException(status_code=409, detail="Cannot delete the last admin")
+
+    db.query(models.Like).filter(models.Like.user_id == user.id).delete(
+        synchronize_session=False,
+    )
+    db.query(models.Bookmark).filter(models.Bookmark.user_id == user.id).delete(
+        synchronize_session=False,
+    )
+    db.query(models.Blog).filter(models.Blog.author_id == user.id).update(
+        {models.Blog.author_id: None},
+        synchronize_session=False,
+    )
+    db.delete(user)
+    db.commit()
+    return Response(status_code=204)
 
 
 @app.patch("/users/me/email", response_model=schemas.UserResponse)
@@ -412,6 +482,10 @@ def create_blog(
     new_blog = models.Blog(
         title=blog.title,
         content=blog.content,
+        cover_image_url=blog.cover_image_url,
+        cover_image_alt=blog.cover_image_alt,
+        background_image_url=blog.background_image_url,
+        background_image_alt=blog.background_image_alt,
         author_id=user.id,
         status=blog.status,
     )
@@ -434,6 +508,10 @@ def update_blog(
 
     existing_blog.title = blog.title
     existing_blog.content = blog.content
+    existing_blog.cover_image_url = blog.cover_image_url
+    existing_blog.cover_image_alt = blog.cover_image_alt
+    existing_blog.background_image_url = blog.background_image_url
+    existing_blog.background_image_alt = blog.background_image_alt
     existing_blog.status = blog.status
     db.commit()
     db.refresh(existing_blog)

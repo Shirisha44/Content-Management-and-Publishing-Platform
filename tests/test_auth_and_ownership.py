@@ -16,6 +16,7 @@ from sqlalchemy.pool import StaticPool
 import models
 from auth import SECRET_KEY, verify_password
 from database import Base
+import main
 from main import app, get_db
 
 
@@ -120,6 +121,181 @@ def test_reader_cannot_create_stories(client: TestClient):
         json={"title": "Not allowed", "content": "Readers cannot publish."},
     )
     assert response.status_code == 403
+
+
+def test_reader_writer_and_admin_story_permissions(client: TestClient):
+    writer_token = register_and_login(client, "permission_writer", "writer")
+    reader_token = register_and_login(client, "permission_reader", "reader")
+    story = client.post(
+        "/blogs",
+        headers=auth_header(writer_token),
+        json={"title": "Public story", "content": "A published story.", "status": "published"},
+    )
+    assert story.status_code == 201
+    story_id = story.json()["id"]
+
+    for token in (writer_token, reader_token):
+        assert client.get(f"/blogs/{story_id}", headers=auth_header(token)).status_code == 200
+        assert client.get("/blogs", headers=auth_header(token)).json()["total"] == 1
+
+    reader_headers = auth_header(reader_token)
+    assert client.get("/writer/stories", headers=reader_headers).status_code == 403
+    assert client.post(
+        "/blogs",
+        headers=reader_headers,
+        json={"title": "Blocked story", "content": "Readers cannot write."},
+    ).status_code == 403
+    assert client.put(
+        f"/blogs/{story_id}",
+        headers=reader_headers,
+        json={"title": "Blocked edit", "content": "Readers cannot edit."},
+    ).status_code == 403
+    assert client.delete(f"/blogs/{story_id}", headers=reader_headers).status_code == 403
+    assert client.post(
+        "/images",
+        headers=reader_headers,
+        files={"image": ("story.png", b"\x89PNG\r\n\x1a\nimage", "image/png")},
+    ).status_code == 403
+
+    with client.app.state.test_session() as db:
+        reader = db.query(models.User).filter_by(username="permission_reader").one()
+        reader.role = "admin"
+        db.commit()
+
+    admin_headers = auth_header(reader_token)
+    admin_story = client.post(
+        "/blogs",
+        headers=admin_headers,
+        json={"title": "Admin story", "content": "Admins can write too."},
+    )
+    assert admin_story.status_code == 201
+    updated = client.put(
+        f"/blogs/{story_id}",
+        headers=admin_headers,
+        json={"title": "Admin edited story", "content": "Admins can manage any story."},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Admin edited story"
+    assert len(client.get("/writer/stories", headers=admin_headers).json()) == 2
+
+
+def test_writer_can_upload_and_use_story_images(client: TestClient):
+    token = register_and_login(client, "image_writer", "writer")
+    image_bytes = b"\x89PNG\r\n\x1a\nsmall test image"
+    upload = client.post(
+        "/images",
+        headers=auth_header(token),
+        files={"image": ("cover.png", image_bytes, "image/png")},
+    )
+    assert upload.status_code == 201
+    image_url = upload.json()["url"]
+    image_path = main.UPLOAD_DIR / image_url.rsplit("/", 1)[-1]
+    try:
+        assert client.get(image_url).content == image_bytes
+        created = client.post(
+            "/blogs",
+            headers=auth_header(token),
+            json={
+                "title": "Story with images",
+                "content": f"Opening paragraph.\n\n![Inside image]({image_url})",
+                "status": "published",
+                "cover_image_url": image_url,
+                "cover_image_alt": "A garden in spring",
+                "background_image_url": image_url,
+                "background_image_alt": "Soft illustrated garden background",
+            },
+        )
+        assert created.status_code == 201
+        assert created.json()["cover_image_url"] == image_url
+        assert created.json()["cover_image_alt"] == "A garden in spring"
+        assert created.json()["background_image_url"] == image_url
+        assert created.json()["background_image_alt"] == "Soft illustrated garden background"
+        assert image_url in created.json()["content"]
+        assert client.get("/blogs").json()["data"][0]["cover_image_url"] == image_url
+
+        invalid_upload = client.post(
+            "/images",
+            headers=auth_header(token),
+            files={"image": ("not-an-image.png", b"not an image", "image/png")},
+        )
+        assert invalid_upload.status_code == 415
+        invalid_cover = client.post(
+            "/blogs",
+            headers=auth_header(token),
+            json={
+                "title": "External cover",
+                "content": "Cover URLs must come from the upload endpoint.",
+                "cover_image_url": "https://example.test/image.png",
+            },
+        )
+        assert invalid_cover.status_code == 422
+    finally:
+        image_path.unlink(missing_ok=True)
+
+
+def test_account_deletion_requires_password_and_preserves_stories(client: TestClient):
+    password = "correct-horse-battery-staple"
+    token = register_and_login(client, "delete_account", "writer")
+    headers = auth_header(token)
+    published = client.post(
+        "/blogs",
+        headers=headers,
+        json={"title": "Kept published story", "content": "Still available.", "status": "published"},
+    )
+    draft = client.post(
+        "/blogs",
+        headers=headers,
+        json={"title": "Kept private draft", "content": "Still private."},
+    )
+    assert published.status_code == 201
+    assert draft.status_code == 201
+    assert client.post(f"/blogs/{published.json()['id']}/like", headers=headers).status_code == 200
+    assert client.post(f"/blogs/{published.json()['id']}/bookmark", headers=headers).status_code == 200
+
+    assert client.request(
+        "DELETE",
+        "/users/me",
+        headers=headers,
+        json={"current_password": "wrong-password"},
+    ).status_code == 401
+    assert client.get("/users/me", headers=headers).status_code == 200
+    deleted = client.request(
+        "DELETE",
+        "/users/me",
+        headers=headers,
+        json={"current_password": password},
+    )
+    assert deleted.status_code == 204
+    assert client.get("/users/me", headers=headers).status_code == 401
+    assert client.get(f"/blogs/{published.json()['id']}").status_code == 200
+    assert client.get(f"/blogs/{draft.json()['id']}").status_code == 404
+
+    with client.app.state.test_session() as db:
+        stories = db.query(models.Blog).order_by(models.Blog.id).all()
+        assert [(item.status, item.author_id) for item in stories] == [
+            ("published", None),
+            ("draft", None),
+        ]
+        assert db.query(models.Like).count() == 0
+        assert db.query(models.Bookmark).count() == 0
+
+
+def test_last_admin_cannot_delete_their_account(client: TestClient):
+    password = "correct-horse-battery-staple"
+    token = register_and_login(client, "only_admin", "writer")
+    with client.app.state.test_session() as db:
+        admin = db.query(models.User).filter_by(username="only_admin").one()
+        admin.role = "admin"
+        db.commit()
+
+    response = client.request(
+        "DELETE",
+        "/users/me",
+        headers=auth_header(token),
+        json={"current_password": password},
+    )
+    assert response.status_code == 409
+    assert client.get("/users/me", headers=auth_header(token)).status_code == 200
 
 
 def test_writer_drafts_are_private_and_ownership_is_enforced(client: TestClient):

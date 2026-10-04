@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { CircleUserRound, LoaderCircle } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import PasswordInput from "../components/PasswordInput.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AuthPage({ mode }) {
@@ -51,7 +52,7 @@ export default function AuthPage({ mode }) {
             autoComplete="username"
             minLength={isSignup ? 3 : 1}
             maxLength={64}
-            pattern={isSignup ? "[A-Za-z0-9_.-]+" : undefined}
+            pattern={isSignup ? "[A-Za-z0-9_.\\x2d]+" : undefined}
             required
             value={form.username}
             onChange={(event) => setForm({ ...form, username: event.target.value })}
@@ -72,8 +73,7 @@ export default function AuthPage({ mode }) {
         )}
         <label className="form-label">
           PASSWORD
-          <input
-            type="password"
+          <PasswordInput
             autoComplete={isSignup ? "new-password" : "current-password"}
             minLength={isSignup ? 12 : undefined}
             maxLength={72}

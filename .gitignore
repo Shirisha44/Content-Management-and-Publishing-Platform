@@ -5,3 +5,6 @@ blog.db
 frontend/.env.local
 frontend/node_modules/
 frontend/dist/
+uploads/
+!uploads/
+!uploads/*.svg

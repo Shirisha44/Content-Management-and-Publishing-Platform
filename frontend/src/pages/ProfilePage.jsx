@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Bookmark, CircleUserRound, LoaderCircle, Mail, Save } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Bookmark, CircleUserRound, LoaderCircle, Mail, Save, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import PasswordInput from "../components/PasswordInput.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiRequest } from "../lib/api.js";
 
 export default function ProfilePage() {
-  const { user, token } = useAuth();
+  const { user, token, deleteAccount } = useAuth();
+  const navigate = useNavigate();
   const [bookmarks, setBookmarks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -14,6 +16,9 @@ export default function ProfilePage() {
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     setRecoveryEmail(user?.email || "");
@@ -63,6 +68,21 @@ export default function ProfilePage() {
     }
   }
 
+  async function removeAccount(event) {
+    event.preventDefault();
+    if (!window.confirm("Delete your account permanently? This cannot be undone.")) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      await deleteAccount(deletePassword);
+      navigate("/", { replace: true });
+    } catch (requestError) {
+      setDeleteError(requestError.message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   return (
     <main className="content-section profile-page">
       <div className="eyebrow"><span className="eyebrow-line" /> YOUR INKWELL</div>
@@ -94,8 +114,7 @@ export default function ProfilePage() {
           </label>
           <label className="form-label">
             CURRENT PASSWORD
-            <input
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
               maxLength={72}
               required
@@ -141,6 +160,32 @@ export default function ProfilePage() {
             <Link className="text-button" to="/">Explore stories</Link>
           </div>
         )}
+      </section>
+
+      <section className="delete-account-section" aria-labelledby="delete-account-title">
+        <h2 id="delete-account-title"><Trash2 size={19} /> Delete account</h2>
+        <p>
+          This permanently removes your account and bookmarks. Your published stories will
+          remain available without your account attached; drafts will remain private and
+          can only be accessed by an admin.
+        </p>
+        <form onSubmit={removeAccount}>
+          <label className="form-label">
+            CURRENT PASSWORD
+            <PasswordInput
+              autoComplete="current-password"
+              maxLength={72}
+              required
+              value={deletePassword}
+              onChange={(event) => setDeletePassword(event.target.value)}
+            />
+          </label>
+          {deleteError && <div className="error-banner" role="alert">{deleteError}</div>}
+          <button className="delete-account-button" type="submit" disabled={deleteBusy || !deletePassword}>
+            {deleteBusy ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}
+            Delete my account
+          </button>
+        </form>
       </section>
     </main>
   );
