@@ -11,10 +11,11 @@ from schemas import RegisterRequest
 
 def main() -> None:
     username = input("Admin username: ").strip()
+    email = input("Admin email: ").strip()
     password = getpass("Admin password: ")
 
     try:
-        credentials = RegisterRequest(username=username, password=password)
+        credentials = RegisterRequest(username=username, email=email, password=password)
     except ValidationError as exc:
         raise SystemExit(f"Invalid admin credentials: {exc}") from exc
 
@@ -28,6 +29,7 @@ def main() -> None:
         db.add(
             models.User(
                 username=credentials.username,
+                email=credentials.email,
                 password_hash=hash_password(credentials.password),
                 role="admin",
             )
