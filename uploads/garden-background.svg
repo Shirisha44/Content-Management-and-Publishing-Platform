@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="wash" x2="0" y2="1">
+      <stop stop-color="#d1ece2"/>
+      <stop offset=".55" stop-color="#f3e9ce"/>
+      <stop offset="1" stop-color="#b8d4b4"/>
+    </linearGradient>
+    <radialGradient id="sun">
+      <stop stop-color="#fff8db" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#fff8db" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#wash)"/>
+  <circle cx="890" cy="180" r="270" fill="url(#sun)"/>
+  <g fill="#fff" opacity=".26" filter="url(#soft)">
+    <ellipse cx="180" cy="245" rx="220" ry="50"/>
+    <ellipse cx="770" cy="365" rx="270" ry="48"/>
+  </g>
+  <path d="M0 565q220-120 450-10t430-8q175-92 320-64v417H0z" fill="#96ba9b" opacity=".8"/>
+  <path d="M0 670q250-100 450 10t410-15q200-106 340-30v265H0z" fill="#6d987b" opacity=".76"/>
+  <g fill="#47765d" opacity=".43">
+    <path d="M0 900V506q40-94 85 0v394zm82 0V418q55-128 108 0v482zm922 0V446q48-112 96 0v454zm86 0V505q48-101 96 0v395z"/>
+  </g>
+  <g fill="#f8f1d9" opacity=".3">
+    <circle cx="155" cy="650" r="8"/><circle cx="207" cy="705" r="6"/>
+    <circle cx="1040" cy="625" r="9"/><circle cx="980" cy="739" r="7"/>
+    <circle cx="755" cy="800" r="6"/><circle cx="315" cy="825" r="8"/>
+  </g>
+</svg>

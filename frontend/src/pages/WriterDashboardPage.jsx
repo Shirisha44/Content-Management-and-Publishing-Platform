@@ -3,6 +3,12 @@ import { FilePlus2, PenLine, Trash2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { apiRequest } from "../lib/api.js";
+import { prepareStoryContent } from "../lib/storyContent.js";
+
+function storyExcerpt(content) {
+  const text = new DOMParser().parseFromString(prepareStoryContent(content), "text/html").body.textContent || "";
+  return `${text.slice(0, 180)}${text.length > 180 ? "…" : ""}`;
+}
 
 export default function WriterDashboardPage() {
   const { token } = useAuth();
@@ -68,7 +74,7 @@ export default function WriterDashboardPage() {
                   <span>Updated {new Date(story.updated_at).toLocaleDateString()}</span>
                 </div>
                 <h2>{story.title}</h2>
-                <p>{story.content.slice(0, 180)}{story.content.length > 180 ? "…" : ""}</p>
+                <p>{storyExcerpt(story.content)}</p>
               </div>
               <div className="dashboard-actions">
                 <Link

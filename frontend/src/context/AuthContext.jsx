@@ -64,9 +64,21 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const deleteAccount = useCallback(async (currentPassword) => {
+    await apiRequest(
+      "/users/me",
+      {
+        method: "DELETE",
+        body: JSON.stringify({ current_password: currentPassword }),
+      },
+      token,
+    );
+    logout();
+  }, [logout, token]);
+
   const value = useMemo(
-    () => ({ token, user, loading, login, signup, logout }),
-    [token, user, loading, login, signup, logout],
+    () => ({ token, user, loading, login, signup, logout, deleteAccount }),
+    [token, user, loading, login, signup, logout, deleteAccount],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

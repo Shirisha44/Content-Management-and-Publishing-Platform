@@ -32,6 +32,10 @@ class Blog(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
+    cover_image_url = Column(String(500), nullable=True)
+    cover_image_alt = Column(String(250), nullable=True)
+    background_image_url = Column(String(500), nullable=True)
+    background_image_alt = Column(String(250), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

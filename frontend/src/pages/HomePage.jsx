@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Search } from "lucide-react";
 import { Link } from "react-router-dom";
-import { apiRequest } from "../lib/api.js";
+import { apiRequest, mediaUrl } from "../lib/api.js";
+import { prepareStoryContent } from "../lib/storyContent.js";
 
 const PAGE_SIZE = 8;
 
 function readTime(content) {
-  return `${Math.max(1, Math.ceil(content.trim().split(/\s+/).length / 220))} min read`;
+  const text = new DOMParser().parseFromString(prepareStoryContent(content), "text/html").body.textContent || content;
+  return `${Math.max(1, Math.ceil(text.trim().split(/\s+/).length / 220))} min read`;
+}
+
+function storyExcerpt(content) {
+  const text = new DOMParser().parseFromString(prepareStoryContent(content), "text/html").body.textContent || "";
+  return `${text.slice(0, 180)}${text.length > 180 ? "…" : ""}`;
 }
 
 export default function HomePage() {
@@ -49,19 +56,18 @@ export default function HomePage() {
     <main>
       <section className="hero" aria-labelledby="home-title">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-line" /> AN INDEPENDENT JOURNAL</div>
-          <h1 id="home-title">Ideas find a<br /><em>home here.</em></h1>
+          <div className="eyebrow"><span className="eyebrow-line" /> STORIES WORTH SHARING</div>
+          <h1 id="home-title">Every story has a<br /><em>place here.</em></h1>
           <p className="hero-description">
-            Essays, observations, and little sparks of curiosity. A slower corner of the internet, made for stories worth thinking about.
+            Thoughts, experiences and ideas from people who like to write.
           </p>
-          <a className="explore-link" href="#stories">Explore the journal <ArrowRight size={15} /></a>
+          <a className="explore-link" href="#stories">Start reading <ArrowRight size={15} /></a>
         </div>
       </section>
 
       <section className="content-section" id="stories" aria-labelledby="stories-title">
         <div className="section-heading">
           <div>
-            <div className="eyebrow"><span className="eyebrow-line" /> THE JOURNAL</div>
             <h2 id="stories-title">Explore stories <span>({total})</span></h2>
           </div>
           <label className="search-box">
@@ -89,13 +95,20 @@ export default function HomePage() {
             {stories.map((story) => (
               <article className="story-row" key={story.id}>
                 <Link className="story-main" to={`/stories/${story.id}`}>
+                  {story.cover_image_url && (
+                    <img
+                      className="story-cover-image"
+                      src={mediaUrl(story.cover_image_url)}
+                      alt={story.cover_image_alt || ""}
+                    />
+                  )}
                   <div className="story-meta">
                     <span>Story {String(story.id).padStart(2, "0")}</span>
                     <span aria-hidden="true">·</span>
                     <span>{readTime(story.content)}</span>
                   </div>
                   <h3>{story.title}</h3>
-                  <p>{story.content.slice(0, 180)}{story.content.length > 180 ? "…" : ""}</p>
+                  <p>{storyExcerpt(story.content)}</p>
                   <span className="read-link">Read story <ArrowRight size={14} /></span>
                 </Link>
               </article>
