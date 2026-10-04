@@ -357,7 +357,6 @@ h1, h2, .story-row h3, .selected-card h3, .start-card h3, .empty-state h3 {
   .app-shell { padding: 0 20px; }
   .topbar { min-height: 70px; gap: 18px; }
   .top-nav { height: 70px; gap: 16px; font-size: 12px; }
-  .top-nav a:nth-child(2) { display: none; }
   .top-actions { gap: 7px; }
   .hero { grid-template-columns: 1fr; min-height: 0; margin-top: 18px; padding: 30px 7% 16px; }
   .hero-copy { padding: 20px 0 8px; }
@@ -563,7 +562,20 @@ h1, h2, .story-row h3, .selected-card h3, .start-card h3, .empty-state h3 {
 
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; gap: 10px; padding: 12px 0; }
-  .top-nav { order: 3; width: 100%; height: auto; min-height: 34px; }
+  .top-nav {
+    display: flex;
+    order: 3;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 42px;
+    gap: 20px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .top-nav::-webkit-scrollbar { display: none; }
+  .top-nav a { height: 42px; flex: 0 0 auto; white-space: nowrap; }
   .top-actions { gap: 6px; }
   .editor-status { display: none; }
   .hero { min-height: 280px; }
